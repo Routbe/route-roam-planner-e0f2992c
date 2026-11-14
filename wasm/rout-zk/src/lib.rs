@@ -2,7 +2,9 @@
 //! signatures over BLS12-381 (ciphersuite BLS12-381-SHA-256) and the
 //! per-booking guest pseudonym. Part 7b: Pedersen commitments with
 //! homomorphic add/sub and 64-bit Bulletproofs range proofs over G1
-//! (`pedersen`, `bulletproofs`).
+//! (`pedersen`, `bulletproofs`). Part 7c: the Poseidon permutation over the
+//! BLS12-381 scalar field and a 256-deep Sparse Merkle Tree of nullifiers
+//! with enclave-signed roots (`poseidon`, `smt`).
 //!
 //! Specifications followed (editor's copies, see tests/fixtures/SOURCE.md):
 //!   * draft-irtf-cfrg-bbs-signatures (core BBS: KeyGen, SkToPk, Sign, Verify,
@@ -34,8 +36,11 @@ pub mod core_bbs;
 pub mod generators;
 pub mod limits;
 pub mod pedersen;
+pub mod poseidon;
+pub mod poseidon_constants;
 pub mod pseudonym;
 pub mod random;
+pub mod smt;
 pub mod wipe;
 pub mod xmd;
 

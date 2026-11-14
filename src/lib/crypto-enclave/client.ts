@@ -8,6 +8,7 @@ import type { PrivateEnvelope } from "@/lib/ledger/crypto";
 import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
+import type { SignedRoot } from "./smt";
 import { wipeMessage } from "@/lib/crypto/wipe";
 
 export type { LedgerDraft, SealedForUser, VaultSummary } from "./protocol";
@@ -17,6 +18,9 @@ export class EnclaveError extends Error {
     super(`enclave:${code}`);
   }
 }
+
+/** Signed roots are public; the worker wipes its request copy, so send a copy. */
+const copyRoot = (s: SignedRoot): SignedRoot => ({ ...s, root: s.root.slice(), publicKey: s.publicKey.slice(), signature: s.signature.slice() });
 
 const TIMEOUT_MS = 120_000; // RSA-3072 generation on slow phones can take a while
 type Waiter = { resolve: (v: unknown) => void; reject: (e: EnclaveError) => void; timer: ReturnType<typeof setTimeout>; started: boolean; owner: Worker };
@@ -213,6 +217,16 @@ export const enclave = {
       callEnclave("bulletproofs.prove_range", { value, blinding, context: context.slice() }, moved(blinding)),
     verifyRange: (commitment: Uint8Array, proof: Uint8Array, context: Uint8Array) =>
       callEnclave("bulletproofs.verify_range", { commitment: commitment.slice(), proof: proof.slice(), context: context.slice() }),
+  },
+  smt: {
+    /** Empty nullifier tree for `treeId`, signed at epoch 0 by this member's root key. */
+    genesis: (userId: string, treeId: string) => callEnclave("smt.genesis", { userId, treeId }),
+    /** Spends `nullifier` against a signed root; { inserted: false } for a reused nullifier, a foreign/edited/stale root or wrong siblings. */
+    insertNullifier: (userId: string, signedRoot: SignedRoot, nullifier: Uint8Array, siblings: Uint8Array) =>
+      callEnclave("smt.insert_nullifier", { userId, signedRoot: copyRoot(signedRoot), nullifier: nullifier.slice(), siblings: siblings.slice() }),
+    verifyNonMembership: (userId: string, signedRoot: SignedRoot, nullifier: Uint8Array, siblings: Uint8Array) =>
+      callEnclave("smt.verify_non_membership", { userId, signedRoot: copyRoot(signedRoot), nullifier: nullifier.slice(), siblings: siblings.slice() }),
+    verifySignedRoot: (userId: string, signedRoot: SignedRoot) => callEnclave("smt.verify_signed_root", { userId, signedRoot: copyRoot(signedRoot) }),
   },
   rve1: {
     /** This member's RVE1 device key: id and public key only. */

@@ -166,8 +166,10 @@
   - [ ] Forward-secure sleutel per epoch (oude epochsleutels niet afleidbaar uit nieuwere)
   - [x] 7b: Pedersen-commitments (homomorf optellen/aftrekken) + Bulletproofs-range-proofs v ∈ [0, 2^64−1] in rout-zk; worker-ops pedersen.commit / bulletproofs.prove_range / bulletproofs.verify_range
   - [ ] 7b vervolg: a ≤ t ≤ b (twee range proofs op t−a en b−t) en Σcᵢ ≤ C koppelen aan boekingen (7f)
-  - [ ] Externe audit van de eigen BBS- en Bulletproofs-code (regel 'audited libraries' in booking-engine/AGENTS.md)
-  - [ ] Poseidon-SMT voor nullifiers met (non-)membership-bewijzen; hergebruik geweigerd
+  - [ ] Externe audit van de eigen BBS-, Bulletproofs-, Poseidon- en SMT-code (regel 'audited libraries' in booking-engine/AGENTS.md)
+  - [x] 7c: Poseidon (referentie x5_255_3, constanten via Grain herberekend en gelijk) + 256-diepe nullifier-SMT met NonExist/Exist, hergebruik geweigerd; ondertekende root (BBS, eigen sleutel uit device-seed) per epoch; worker-ops smt.genesis / smt.insert_nullifier / smt.verify_non_membership / smt.verify_signed_root
+  - [ ] 7c vervolg: blijvende bescherming tegen terugdraaien van een oude ondertekende root (nu alleen high-water mark in het werkgeheugen) via externe verankering
+  - [ ] 7c vervolg: meerdere toestellen van één host (nu tekent elk toestel met een eigen rootsleutel)
   - [x] 7a: pseudonyms.ts + worker-op `pseudonym.derive` (HKDF-Expand + HMAC-SHA256, gedeelde vector met Rust)
   - [ ] TS-wrappers voor BBS in de crypto-worker (na pin van rout-zk)
   - [ ] Besluit: waar het master_seed van de gast vandaan komt (7f)

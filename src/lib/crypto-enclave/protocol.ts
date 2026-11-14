@@ -11,6 +11,7 @@ import type { PrivateEnvelope } from "@/lib/ledger/crypto";
 import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
+import type { SignedRoot } from "./smt";
 import type { SubjectClaim } from "@/lib/recovery/pairwise";
 
 /** Public metadata of a decrypted handoff; the full config stays inside the worker. */
@@ -153,6 +154,19 @@ export interface EnclaveOps {
   /** Commitment plus a 928-octet proof that value ∈ [0, 2^64 - 1], bound to `context`. */
   "bulletproofs.prove_range": { req: { value: bigint; blinding: Uint8Array; context: Uint8Array }; res: { commitment: Uint8Array; proof: Uint8Array } };
   "bulletproofs.verify_range": { req: { commitment: Uint8Array; proof: Uint8Array; context: Uint8Array }; res: { valid: boolean } };
+  /**
+   * Nullifier SMT (Stap 7c, smt.ts). Roots are signed with a key derived from
+   * the member's device seed inside the engine; only roots signed by that key
+   * and not older than the worker's high-water mark are accepted. `siblings`
+   * is 256 x 32 octets from the untrusted node store.
+   */
+  "smt.genesis": { req: { userId: string; treeId: string }; res: { signedRoot: SignedRoot } };
+  "smt.insert_nullifier": {
+    req: { userId: string; signedRoot: SignedRoot; nullifier: Uint8Array; siblings: Uint8Array };
+    res: { inserted: true; signedRoot: SignedRoot; path: Uint8Array } | { inserted: false };
+  };
+  "smt.verify_non_membership": { req: { userId: string; signedRoot: SignedRoot; nullifier: Uint8Array; siblings: Uint8Array }; res: { valid: boolean } };
+  "smt.verify_signed_root": { req: { userId: string; signedRoot: SignedRoot }; res: { valid: boolean } };
   "protocol.verifyChain": { req: { events: SignedEvent[] }; res: { ok: true } | { ok: false; error: string; at: number } };
 }
 
