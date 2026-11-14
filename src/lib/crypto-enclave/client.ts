@@ -9,6 +9,7 @@ import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
 import type { SignedRoot } from "./smt";
+import type { EpochLink, HostKeyAnchor } from "./forward-secure";
 import { wipeMessage } from "@/lib/crypto/wipe";
 
 export type { LedgerDraft, SealedForUser, VaultSummary } from "./protocol";
@@ -21,6 +22,8 @@ export class EnclaveError extends Error {
 
 /** Signed roots are public; the worker wipes its request copy, so send a copy. */
 const copyRoot = (s: SignedRoot): SignedRoot => ({ ...s, root: s.root.slice(), publicKey: s.publicKey.slice(), signature: s.signature.slice() });
+/** Epoch chains are public; send copies for the same reason. */
+const copyLinks = (l: EpochLink[]): EpochLink[] => l.map((x) => ({ from: x.from, to: x.to, publicKey: x.publicKey.slice(), signature: x.signature.slice() }));
 
 const TIMEOUT_MS = 120_000; // RSA-3072 generation on slow phones can take a while
 type Waiter = { resolve: (v: unknown) => void; reject: (e: EnclaveError) => void; timer: ReturnType<typeof setTimeout>; started: boolean; owner: Worker };
@@ -227,6 +230,33 @@ export const enclave = {
     verifyNonMembership: (userId: string, signedRoot: SignedRoot, nullifier: Uint8Array, siblings: Uint8Array) =>
       callEnclave("smt.verify_non_membership", { userId, signedRoot: copyRoot(signedRoot), nullifier: nullifier.slice(), siblings: siblings.slice() }),
     verifySignedRoot: (userId: string, signedRoot: SignedRoot) => callEnclave("smt.verify_signed_root", { userId, signedRoot: copyRoot(signedRoot) }),
+  },
+  hostKey: {
+    /** New forward-secure key chain `keyId` for this member; returns the anchor PK_0 to publish. */
+    init: (userId: string, keyId: string) => callEnclave("host_key.init", { userId, keyId }),
+    /** Ratchets to `toEpoch` (> current); the old state is erased in the worker, the returned link proves the new key. */
+    advanceEpoch: (userId: string, keyId: string, toEpoch: number) => callEnclave("host_key.advance_epoch", { userId, keyId, toEpoch }),
+    /** Credential under the current epoch key; `epoch` must be the current one. A guest commitment makes it blind. */
+    signCredential: (userId: string, keyId: string, epoch: number, messages: Uint8Array[], commitmentWithProof?: Uint8Array) =>
+      callEnclave("host_key.sign_credential", { userId, keyId, epoch, messages: messages.map((m) => m.slice()), ...(commitmentWithProof ? { commitmentWithProof: commitmentWithProof.slice() } : {}) }),
+    chain: (userId: string, keyId: string) => callEnclave("host_key.chain", { userId, keyId }),
+    /** Guest side; `proverBlind` is transferred (the caller's copy is emptied). */
+    verifyEpochCredential: (input: {
+      anchor: HostKeyAnchor; links: EpochLink[]; epoch: number; minEpoch?: number; signature: Uint8Array; messages: Uint8Array[];
+      committedMessages?: Uint8Array[]; proverBlind?: Uint8Array;
+    }) =>
+      callEnclave(
+        "host_key.verify_epoch_credential",
+        {
+          ...input,
+          anchor: { keyId: input.anchor.keyId, publicKey: input.anchor.publicKey.slice() },
+          links: copyLinks(input.links),
+          signature: input.signature.slice(),
+          messages: input.messages.map((m) => m.slice()),
+          ...(input.committedMessages ? { committedMessages: input.committedMessages.map((m) => m.slice()) } : {}),
+        },
+        moved(input.proverBlind),
+      ),
   },
   rve1: {
     /** This member's RVE1 device key: id and public key only. */

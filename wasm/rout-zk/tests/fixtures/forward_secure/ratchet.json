@@ -1,0 +1,17 @@
+{
+  "source": "tools/forward_secure_vectors.py (Python hashlib/hmac, RFC 5869 HKDF-SHA256)",
+  "salt": "ROUT-HOST-EPOCH-RATCHET-V1",
+  "info": "rout.v1.host.epoch.state",
+  "seed": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "states": [
+    "2c0278fac82b82c16d1de93e6154b3bcb5cda4f48f3f52acb9a0a27220ce5e57",
+    "506cfc30aed975db5186c5e3556eea961d27c0f7a05e1c1ae5c2a2087ac0fd46",
+    "1f322841b504034a502c08ca8680961286f92b8d52ef0396a6eb35dea267c087",
+    "0bd7d2460c6d87ccab60cb8d2c20b90ac5cb2507c261f86717bec386aadb4b7d",
+    "c797bd20988bd5605b7a3dfb100875a5849851e6ec374aa0184bcbe387a56498",
+    "515b752e80e9a64238f95413e45248ec7b40407bcacfa64f0071f7d11c5c2fb3",
+    "75147d18bf6a795024103ed0c4c37ec9e97330fdf15707c4aa1343358a30e56c",
+    "77003f566aafce0c56ffad0c34519981adde8fbaf0dc868f7088307ed8b9dfaa"
+  ],
+  "state_1000": "69b1116bc679bd62e56d1d23874207030205e0cc45be9afd397729cf07c60fee"
+}

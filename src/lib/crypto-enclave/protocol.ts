@@ -12,6 +12,7 @@ import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
 import type { SignedRoot } from "./smt";
+import type { EpochLink, HostKeyAnchor } from "./forward-secure";
 import type { SubjectClaim } from "@/lib/recovery/pairwise";
 
 /** Public metadata of a decrypted handoff; the full config stays inside the worker. */
@@ -167,6 +168,40 @@ export interface EnclaveOps {
   };
   "smt.verify_non_membership": { req: { userId: string; signedRoot: SignedRoot; nullifier: Uint8Array; siblings: Uint8Array }; res: { valid: boolean } };
   "smt.verify_signed_root": { req: { userId: string; signedRoot: SignedRoot }; res: { valid: boolean } };
+  /**
+   * Forward-secure host keys (Stap 7d, forward-secure.ts). The ratchet state
+   * SK_t never leaves the worker; on every advance the previous state is
+   * zero-filled and overwritten. `host_key.init` needs this member's device
+   * key and refuses a key id the worker already holds. Credentials are signed
+   * only for the current epoch: a request for any other epoch is refused.
+   */
+  "host_key.init": { req: { userId: string; keyId: string }; res: { anchor: HostKeyAnchor; epoch: number } };
+  "host_key.advance_epoch": { req: { userId: string; keyId: string; toEpoch: number }; res: { epoch: number; publicKey: Uint8Array; link: EpochLink } };
+  "host_key.sign_credential": {
+    req: { userId: string; keyId: string; epoch: number; messages: Uint8Array[]; commitmentWithProof?: Uint8Array };
+    res: { epoch: number; publicKey: Uint8Array; signature: Uint8Array };
+  };
+  /** The public chain to publish: anchor PK_0, current epoch and key, every link. */
+  "host_key.chain": { req: { userId: string; keyId: string }; res: { anchor: HostKeyAnchor; epoch: number; publicKey: Uint8Array; links: EpochLink[] } };
+  /**
+   * A guest's check: links from the trusted anchor reach `epoch`, `epoch` is
+   * not below `minEpoch` (expired), and the credential verifies under exactly
+   * that epoch's key. `proverBlind` and `committedMessages` (blind
+   * credentials) are transferred in and wiped.
+   */
+  "host_key.verify_epoch_credential": {
+    req: {
+      anchor: HostKeyAnchor;
+      links: EpochLink[];
+      epoch: number;
+      minEpoch?: number;
+      signature: Uint8Array;
+      messages: Uint8Array[];
+      committedMessages?: Uint8Array[];
+      proverBlind?: Uint8Array;
+    };
+    res: { valid: boolean };
+  };
   "protocol.verifyChain": { req: { events: SignedEvent[] }; res: { ok: true } | { ok: false; error: string; at: number } };
 }
 

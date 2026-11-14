@@ -12,6 +12,7 @@ use crate::random::ScalarSource;
 use crate::codec::{scalar_from_be, scalar_to_be};
 use bls12_381::Scalar;
 use crate::core_bbs::{self, Msg};
+use crate::forward_secure::{self as fs, EpochKey, STATE_LEN};
 use crate::limits::{MAX_BLIND_MESSAGES, MAX_MESSAGES, MAX_SIGNER_MESSAGES};
 use crate::pseudonym;
 use crate::smt::{self, NODE_LEN, NULLIFIER_LEN, PATH_LEN, SIBLINGS_LEN};
@@ -103,8 +104,9 @@ fn indexes(b: &[u8], out: &mut [usize; MAX_MESSAGES]) -> Result<usize, Error> {
 #[no_mangle]
 pub extern "C" fn rout_zk_abi_version() -> u32 {
     // 1 = BBS / Blind BBS / pseudonym (7a); 2 = + Pedersen and range proofs (7b);
-    // 3 = + Poseidon SMT nullifiers with signed roots (7c).
-    3
+    // 3 = + Poseidon SMT nullifiers with signed roots (7c);
+    // 4 = + forward-secure host keys per epoch (7d).
+    4
 }
 
 #[no_mangle]
@@ -416,6 +418,110 @@ pub unsafe extern "C" fn rout_zk_smt_insert(
         )?;
         output(out_root, NODE_LEN).copy_from_slice(&r.root);
         output(out_sig, 80).copy_from_slice(&r.signature);
+        Ok(0)
+    })())
+}
+
+// ---- Stap 7d: forward-secure host keys per epoch -------------------------
+// State 32 octets (SK_t), public key 96, signature 80. Every state region
+// handed in is read once into an EpochKey and then volatile-wiped in the
+// arena, so no copy of a key outlives the call even before the host's
+// zero-fill; the EpochKey itself is wiped on drop.
+
+unsafe fn take_key(state: usize, epoch: u64) -> Result<EpochKey, Error> {
+    let region = output(state, STATE_LEN);
+    let k = EpochKey::from_state(region, epoch);
+    wipe::bytes(region);
+    k
+}
+
+/// key_id -> SK_0 (32) and PK_0 (96). The seed comes from the host CSPRNG and is wiped.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_init(kid: usize, kid_len: usize, out_state: usize, out_pk: usize) -> i32 {
+    code((|| {
+        let mut seed = [0u8; fs::SEED_LEN];
+        rout_random(seed.as_mut_ptr(), seed.len());
+        let k = EpochKey::from_seed(&seed);
+        wipe::bytes(&mut seed);
+        let k = k?;
+        let pk = k.public_key(input(kid, kid_len))?;
+        k.export_state(output(out_state, STATE_LEN))?;
+        output(out_pk, 96).copy_from_slice(&pk);
+        Ok(0)
+    })())
+}
+
+/// state (32, wiped) | epoch | key_id -> PK_epoch (96).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_public_key(state: usize, epoch: u64, kid: usize, kid_len: usize, out_pk: usize) -> i32 {
+    code((|| {
+        let k = take_key(state, epoch)?;
+        output(out_pk, 96).copy_from_slice(&k.public_key(input(kid, kid_len))?);
+        Ok(0)
+    })())
+}
+
+/// state (32, in/out) | epoch | to | key_id -> SK_to written over the old state,
+/// PK_to (96) and the link signature by the old epoch key (80). On error the
+/// state region is left wiped.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_advance(state: usize, epoch: u64, to: u64, kid: usize, kid_len: usize, out_pk: usize, out_sig: usize) -> i32 {
+    code((|| {
+        let mut k = take_key(state, epoch)?;
+        let link = k.advance(input(kid, kid_len), to)?;
+        k.export_state(output(state, STATE_LEN))?;
+        output(out_pk, 96).copy_from_slice(&link.public_key);
+        output(out_sig, 80).copy_from_slice(&link.signature);
+        Ok(0)
+    })())
+}
+
+/// state (32, wiped) | epoch | key_id | commitment_with_proof | packed HASH
+/// messages -> credential signature (80).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_sign(
+    state: usize, epoch: u64, kid: usize, kid_len: usize, cwp: usize, cwp_len: usize, msgs: usize, msgs_len: usize, out_sig: usize,
+) -> i32 {
+    code((|| {
+        let k = take_key(state, epoch)?;
+        let mut m = [Msg::Hash(&[]); MAX_SIGNER_MESSAGES];
+        let n = messages(input(msgs, msgs_len), &mut m)?;
+        let mut r = [&[][..]; MAX_SIGNER_MESSAGES];
+        let n = hashed_only(&m[..n], &mut r)?;
+        let sig = k.sign_credential(input(kid, kid_len), input(cwp, cwp_len), &r[..n])?;
+        output(out_sig, 80).copy_from_slice(&sig);
+        Ok(0)
+    })())
+}
+
+/// pk_from (96) | key_id | from | to | pk_to (96) | sig (80) -> 0, -2 rejected, -1 malformed.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_verify_link(pk_from: usize, kid: usize, kid_len: usize, from: u64, to: u64, pk_to: usize, sig: usize) -> i32 {
+    code((|| {
+        fs::verify_link(input(pk_from, 96), input(kid, kid_len), from, to, input(pk_to, 96), input(sig, 80))?;
+        Ok(0)
+    })())
+}
+
+/// pk (96) | key_id | epoch | sig (80) | packed HASH messages | packed HASH
+/// committed messages | prover blind (32, zero when not blind) -> 0, -2, -1.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_hostkey_verify_credential(
+    pk: usize, kid: usize, kid_len: usize, epoch: u64, sig: usize, msgs: usize, msgs_len: usize, bmsgs: usize, bmsgs_len: usize, prover_blind: usize,
+) -> i32 {
+    code((|| {
+        let mut m = [Msg::Hash(&[]); MAX_SIGNER_MESSAGES];
+        let n = messages(input(msgs, msgs_len), &mut m)?;
+        let mut r = [&[][..]; MAX_SIGNER_MESSAGES];
+        let n = hashed_only(&m[..n], &mut r)?;
+        let mut b = [Msg::Hash(&[]); MAX_BLIND_MESSAGES];
+        let k = messages(input(bmsgs, bmsgs_len), &mut b)?;
+        let mut rb = [&[][..]; MAX_SIGNER_MESSAGES];
+        let k = hashed_only(&b[..k], &mut rb)?;
+        let mut pb = scalar_from_be(input(prover_blind, 32))?;
+        let res = fs::verify_credential(input(pk, 96), input(kid, kid_len), epoch, input(sig, 80), &r[..n], &rb[..k], &pb);
+        wipe::scalar(&mut pb);
+        res?;
         Ok(0)
     })())
 }

@@ -46,6 +46,20 @@ import { pedersenCommit, proveRange, verifyRange } from "./bulletproofs";
 import { checkSignedRoot, RootWatermarks, smtGenesis, smtInsert, smtSignerKeyMaterial, smtSignerPublicKey, smtVerifyNullifier, smtVerifySignedRoot, type SignedRoot } from "./smt";
 import { ZkEngineError } from "./zk-engine";
 import {
+  checkAnchor,
+  checkCommitment,
+  checkLink,
+  copyLink,
+  hostKeyAdvance,
+  hostKeyIdBytes,
+  hostKeyInit,
+  hostKeys,
+  hostKeySign,
+  MAX_CHAIN_LINKS,
+  MAX_EPOCH_ADVANCE,
+  verifyEpochCredential,
+} from "./forward-secure";
+import {
   RECOVERY_FACTORS,
   VERSION_FACTORS,
   VERSION_THRESHOLD,
@@ -113,6 +127,24 @@ async function withSmtKey<T>(userId: string, fn: (keyMaterial: Uint8Array) => Pr
       wipe(km);
     }
   });
+}
+
+/** Shape errors of rout-zk adapters before the engine runs map to invalid_input. */
+function shaped<T>(run: () => T): T {
+  try {
+    return run();
+  } catch (e) {
+    if (e instanceof ZkEngineError) return fail("invalid_input");
+    throw e;
+  }
+}
+
+const epochArg = (v: unknown): number => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : fail("invalid_input"));
+const bytesList = (v: unknown, max: number): Uint8Array[] => (Array.isArray(v) && v.length <= max ? v.map(bytes) : fail("invalid_input"));
+
+/** The held host key of this member, or invalid_input. */
+function hostSlot(owner: string, keyId: string) {
+  return hostKeys.get(owner, keyId) ?? fail("invalid_input");
 }
 
 // ---- Held state (all of it wiped on discard / expiry) ----------------------
@@ -949,6 +981,63 @@ const coreHandlers: CoreHandlers = {
     const valid = await withSmtKey(owner, async (km) => smtVerifySignedRoot(s, await smtSignerPublicKey(km)));
     if (valid) smtMarks.observe(owner, s);
     return { valid };
+  },
+
+  async "host_key.init"({ userId, keyId }) {
+    const owner = str(userId, 200);
+    const kid = str(keyId, 256);
+    shaped(() => hostKeyIdBytes(kid));
+    // Booking keys only for a member whose device key exists (no fallback).
+    await withRve1Key(owner, () => null);
+    if (hostKeys.has(owner, kid)) fail("invalid_input");
+    const { state, publicKey } = await zkOp(() => hostKeyInit(kid));
+    hostKeys.create(owner, kid, state, publicKey);
+    return { anchor: { keyId: kid, publicKey: publicKey.slice() }, epoch: 0 };
+  },
+
+  async "host_key.advance_epoch"({ userId, keyId, toEpoch }) {
+    const owner = str(userId, 200);
+    const kid = str(keyId, 256);
+    const to = epochArg(toEpoch);
+    const slot = hostSlot(owner, kid);
+    if (to <= slot.epoch || to - slot.epoch > MAX_EPOCH_ADVANCE || slot.links.length >= MAX_CHAIN_LINKS) fail("invalid_input");
+    const r = await zkOp(() => hostKeyAdvance(slot.state, slot.epoch, to, kid));
+    hostKeys.advance(owner, kid, r.state, r.link);
+    return { epoch: to, publicKey: r.link.publicKey.slice(), link: copyLink(r.link) };
+  },
+
+  async "host_key.sign_credential"({ userId, keyId, epoch, messages, commitmentWithProof }) {
+    const owner = str(userId, 200);
+    const kid = str(keyId, 256);
+    const slot = hostSlot(owner, kid);
+    // Only the current epoch's key signs; a request formed for an expired or future epoch is refused.
+    if (epochArg(epoch) !== slot.epoch) fail("invalid_input");
+    const msgs = bytesList(messages, 30);
+    const cwp = shaped(() => checkCommitment(commitmentWithProof === undefined ? undefined : bytes(commitmentWithProof)));
+    const signature = await zkOp(() => hostKeySign(slot.state, slot.epoch, kid, msgs, cwp));
+    return { epoch: slot.epoch, publicKey: slot.publicKey.slice(), signature };
+  },
+
+  async "host_key.chain"({ userId, keyId }) {
+    const owner = str(userId, 200);
+    const kid = str(keyId, 256);
+    const slot = hostSlot(owner, kid);
+    return { anchor: { keyId: kid, publicKey: slot.anchor.slice() }, epoch: slot.epoch, publicKey: slot.publicKey.slice(), links: slot.links.map(copyLink) };
+  },
+
+  async "host_key.verify_epoch_credential"({ anchor, links, epoch, minEpoch, signature, messages, committedMessages, proverBlind }) {
+    const a = shaped(() => checkAnchor(anchor));
+    if (!Array.isArray(links) || links.length > MAX_CHAIN_LINKS) fail("invalid_input");
+    const chain = shaped(() => (links as unknown[]).map(checkLink));
+    const check = {
+      epoch: epochArg(epoch),
+      minEpoch: minEpoch === undefined ? undefined : epochArg(minEpoch),
+      signature: bytes(signature),
+      messages: bytesList(messages, 30),
+      committedMessages: committedMessages === undefined ? undefined : bytesList(committedMessages, 16),
+      proverBlind: proverBlind === undefined ? undefined : bytes(proverBlind),
+    };
+    return { valid: await zkOp(() => verifyEpochCredential({ keyId: a.keyId, publicKey: a.publicKey.slice() }, chain.map(copyLink), check)) };
   },
 
   async "hash.sha256Hex"({ text }) {

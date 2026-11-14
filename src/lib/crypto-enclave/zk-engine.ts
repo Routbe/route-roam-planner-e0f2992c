@@ -37,10 +37,18 @@ export type ZkExports = {
     km: number, kmLen: number, tree: number, treeLen: number, root: number, epoch: bigint, sig: number, nf: number, siblings: number,
     outRoot: number, outSig: number, outPath: number,
   ): number;
+  rout_zk_hostkey_init(kid: number, kidLen: number, outState: number, outPk: number): number;
+  rout_zk_hostkey_public_key(state: number, epoch: bigint, kid: number, kidLen: number, outPk: number): number;
+  rout_zk_hostkey_advance(state: number, epoch: bigint, to: bigint, kid: number, kidLen: number, outPk: number, outSig: number): number;
+  rout_zk_hostkey_sign(state: number, epoch: bigint, kid: number, kidLen: number, cwp: number, cwpLen: number, msgs: number, msgsLen: number, outSig: number): number;
+  rout_zk_hostkey_verify_link(pkFrom: number, kid: number, kidLen: number, from: bigint, to: bigint, pkTo: number, sig: number): number;
+  rout_zk_hostkey_verify_credential(
+    pk: number, kid: number, kidLen: number, epoch: bigint, sig: number, msgs: number, msgsLen: number, bmsgs: number, bmsgsLen: number, proverBlind: number,
+  ): number;
 };
 
-/** ABI 3 = BBS / Blind BBS / pseudonym (7a) + Pedersen and range proofs (7b) + Poseidon SMT with signed roots (7c). */
-export const ZK_ENGINE_ABI = 3;
+/** ABI 4 = BBS / Blind BBS / pseudonym (7a) + Pedersen and range proofs (7b) + Poseidon SMT with signed roots (7c) + forward-secure host keys (7d). */
+export const ZK_ENGINE_ABI = 4;
 /** Linked as --initial-memory = --max-memory = 2 MiB (1 MiB stack first). */
 export const ZK_ENGINE_PAGES = 32;
 const PAGE = 65_536;
