@@ -4,15 +4,18 @@ version = "1.0.0"
 edition = "2021"
 publish = false
 license = "AGPL-3.0-only"
-description = "ROUT anonymous booking engine: blind BBS (BLS12-381), Bulletproofs range proofs, Poseidon sparse Merkle nullifiers; fixed memory, allocator-free"
+description = "ROUT anonymous booking engine: BBS and Blind BBS (BLS12-381-SHA-256), per-booking pseudonyms; fixed memory, allocator-free"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
+# Exact versions: the committed .wasm is reproducible only from this lock.
+# bls12_381 0.8 implements hash_to_curve on digest 0.9, so sha2 stays on 0.9.
 [dependencies]
 bls12_381 = { version = "=0.8.0", default-features = false, features = ["groups", "pairings", "experimental"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "=0.9.9", default-features = false }
+subtle = { version = "2.6", default-features = false }
 zeroize = { version = "1.8", default-features = false }
 
 [dev-dependencies]
