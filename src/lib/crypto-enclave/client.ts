@@ -8,6 +8,7 @@ import type { PrivateEnvelope } from "@/lib/ledger/crypto";
 import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
+import type { SignedRoot } from "./smt";
 import { wipeMessage } from "@/lib/crypto/wipe";
 
 export type { LedgerDraft, SealedForUser, VaultSummary } from "./protocol";
@@ -17,6 +18,9 @@ export class EnclaveError extends Error {
     super(`enclave:${code}`);
   }
 }
+
+/** Signed roots are public; the worker wipes its request copy, so send a copy. */
+const copyRoot = (s: SignedRoot): SignedRoot => ({ ...s, root: s.root.slice(), publicKey: s.publicKey.slice(), signature: s.signature.slice() });
 
 const TIMEOUT_MS = 120_000; // RSA-3072 generation on slow phones can take a while
 type Waiter = { resolve: (v: unknown) => void; reject: (e: EnclaveError) => void; timer: ReturnType<typeof setTimeout>; started: boolean; owner: Worker };
