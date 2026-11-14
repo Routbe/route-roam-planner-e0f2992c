@@ -253,13 +253,17 @@ fn range_value(b: &[u8]) -> Result<Scalar, Error> {
 pub unsafe extern "C" fn rout_zk_pedersen_commit(value: usize, blind: usize, out: usize) -> i32 {
     code((|| {
         let mut v = range_value(input(value, 32))?;
-        let mut r = scalar_from_be(input(blind, 32));
-        let c = r.as_ref().map(|r| PedersenGens::canonical().commit(&v, r).to_bytes());
+        let mut r = match scalar_from_be(input(blind, 32)) {
+            Ok(r) => r,
+            Err(e) => {
+                wipe::scalar(&mut v);
+                return Err(e);
+            }
+        };
+        let c = PedersenGens::canonical().commit(&v, &r).to_bytes();
         wipe::scalar(&mut v);
-        if let Ok(r) = r.as_mut() {
-            wipe::scalar(r);
-        }
-        output(out, 48).copy_from_slice(&c?);
+        wipe::scalar(&mut r);
+        output(out, 48).copy_from_slice(&c);
         Ok(0)
     })())
 }
