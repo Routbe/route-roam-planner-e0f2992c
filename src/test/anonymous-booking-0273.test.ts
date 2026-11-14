@@ -102,7 +102,7 @@ describe("0273 anonymous booking engine on a replay of db/", () => {
     expect(a).toMatchObject({ ok: true, why: "ok", epoch: 0, ver: 0 });
     return c;
   };
-  const advance = (user: string, c: Chain, ver: number, from: number, to: number, pk = randomBytes(HOST_PUBLIC_KEY_BYTES), sig = randomBytes(HOST_SIGNATURE_BYTES), state = hsk()) =>
+  const advance = (user: string, c: Chain, ver: number, from: number, to: number, pk: Uint8Array = randomBytes(HOST_PUBLIC_KEY_BYTES), sig: Uint8Array = randomBytes(HOST_SIGNATURE_BYTES), state: Uint8Array = hsk()) =>
     call(user, ADVANCE, [c.keyId, ver, from, to, pk, sig, state]);
   const record = (user: string, c: Chain, head: number, o: { nullifier?: Uint8Array; pseudonym?: Uint8Array; credentialEpoch?: number; root?: Uint8Array; sig?: Uint8Array; proof?: Uint8Array } = {}) =>
     call(user, RECORD, [c.treeId, head, o.root ?? randomBytes(SMT_NODE_BYTES), o.sig ?? randomBytes(ROOT_SIGNATURE_BYTES),
