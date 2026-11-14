@@ -96,6 +96,16 @@ fn empty_root_is_the_folded_empty_tree() {
 }
 
 #[test]
+fn empty_path_lists_every_empty_subtree() {
+    let st = Store::new();
+    let mut out = vec![0u8; PATH_LEN];
+    smt::empty_path(&mut out);
+    for h in 0..=DEPTH {
+        assert_eq!(&out[h * NODE_LEN..(h + 1) * NODE_LEN], &st.empty[h]);
+    }
+}
+
+#[test]
 fn non_membership_holds_for_unspent_nullifiers() {
     let mut st = Store::new();
     let pk = smt::signer_public_key(KM).unwrap();
