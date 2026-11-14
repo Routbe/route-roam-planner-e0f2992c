@@ -287,10 +287,11 @@ pub fn prove<R: ScalarSource>(
     ctx: &[u8],
     rng: &mut R,
 ) -> Result<(Commitment, RangeProof)> {
-    let v = value_u64(value).ok_or(Error::Invalid)?;
+    let mut v = value_u64(value).ok_or(Error::Invalid)?;
     let v_commit = pg.commit(value, blinding);
-    let p = prove_bits(pg, bg, v, &v_commit, blinding, ctx, rng)?;
-    Ok((v_commit, p))
+    let p = prove_bits(pg, bg, v, &v_commit, blinding, ctx, rng);
+    unsafe { core::ptr::write_volatile(&mut v, 0) };
+    Ok((v_commit, p?))
 }
 
 /// The protocol itself, for a commitment the caller claims hides the bits
@@ -307,7 +308,9 @@ fn prove_bits<R: ScalarSource>(
     rng: &mut R,
 ) -> Result<RangeProof> {
     let mut arena = Arena::new();
-    let r = prove_in(&mut arena, pg, bg, v, v_commit, blinding, ctx, rng);
+    let mut bits = v;
+    let r = prove_in(&mut arena, pg, bg, bits, v_commit, blinding, ctx, rng);
+    unsafe { core::ptr::write_volatile(&mut bits, 0) };
     drop(arena); // volatile wipe of every secret buffer
     r
 }
@@ -328,13 +331,14 @@ fn prove_in<R: ScalarSource>(
     }
     rng.fill(&mut w.rand)?;
     w.tmp[0] = *blinding;
-    let (alpha, rho, tau1, tau2) = (w.rand[0], w.rand[1], w.rand[2], w.rand[3]);
+    // α = rand[0], ρ = rand[1], τ1 = rand[2], τ2 = rand[3]; read in place so
+    // no copy outlives the arena.
     let one = Scalar::one();
 
     // a_L = bits(v), a_R = a_L - 1^n; A = α·h + Σ a_L,i·G_i + Σ a_R,i·H_i
     // with a_L,i ∈ {0, 1} and a_R,i ∈ {-1, 0}, selected without branching.
     let id = G1Projective::identity();
-    let mut a_pt = pg.h * alpha;
+    let mut a_pt = pg.h * w.rand[0];
     for i in 0..N {
         let bit = Choice::from(((v >> i) & 1) as u8);
         w.a_l[i] = Scalar::conditional_select(&Scalar::zero(), &one, bit);
@@ -343,7 +347,7 @@ fn prove_in<R: ScalarSource>(
         a_pt -= G1Projective::conditional_select(&bg.h[i], &id, bit);
     }
     // S = ρ·h + Σ s_L,i·G_i + Σ s_R,i·H_i
-    let mut s_pt = pg.h * rho;
+    let mut s_pt = pg.h * w.rand[1];
     for i in 0..N {
         s_pt += bg.g[i] * w.rand[4 + i];
         s_pt += bg.h[i] * w.rand[4 + N + i];
@@ -367,13 +371,12 @@ fn prove_in<R: ScalarSource>(
         w.l[i] = w.a_l[i] - z;
         w.r[i] = w.y_pow[i] * (w.a_r[i] + z) + z2 * two;
         two = two.double();
-        let sl = w.rand[4 + i];
-        let r1 = w.y_pow[i] * w.rand[4 + N + i];
-        w.tmp[1] += w.l[i] * r1 + sl * w.r[i];
-        w.tmp[2] += sl * r1;
+        w.tmp[5] = w.y_pow[i] * w.rand[4 + N + i]; // r1,i
+        w.tmp[1] += w.l[i] * w.tmp[5] + w.rand[4 + i] * w.r[i];
+        w.tmp[2] += w.rand[4 + i] * w.tmp[5];
     }
-    let t1_pt = pg.g * w.tmp[1] + pg.h * tau1;
-    let t2_pt = pg.g * w.tmp[2] + pg.h * tau2;
+    let t1_pt = pg.g * w.tmp[1] + pg.h * w.rand[2];
+    let t2_pt = pg.g * w.tmp[2] + pg.h * w.rand[3];
     t.point(b'1', &t1_pt);
     t.point(b'2', &t2_pt);
     let x = t.challenge(3)?;
@@ -384,8 +387,8 @@ fn prove_in<R: ScalarSource>(
         w.r[i] += x * w.y_pow[i] * w.rand[4 + N + i];
     }
     let t_hat = inner(&w.l, &w.r);
-    let tau_x = tau2 * x.square() + tau1 * x + z2 * w.tmp[0];
-    let mu = alpha + rho * x;
+    let tau_x = w.rand[3] * x.square() + w.rand[2] * x + z2 * w.tmp[0];
+    let mu = w.rand[0] + w.rand[1] * x;
     t.scalar(b't', &tau_x);
     t.scalar(b'm', &mu);
     t.scalar(b'h', &t_hat);
