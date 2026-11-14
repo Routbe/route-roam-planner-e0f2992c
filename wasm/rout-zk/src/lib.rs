@@ -4,7 +4,9 @@
 //! homomorphic add/sub and 64-bit Bulletproofs range proofs over G1
 //! (`pedersen`, `bulletproofs`). Part 7c: the Poseidon permutation over the
 //! BLS12-381 scalar field and a 256-deep Sparse Merkle Tree of nullifiers
-//! with enclave-signed roots (`poseidon`, `smt`).
+//! with enclave-signed roots (`poseidon`, `smt`). Part 7d: forward-secure
+//! host keys, an HKDF-SHA256 ratchet per epoch with signed epoch links and
+//! epoch-bound credentials (`forward_secure`).
 //!
 //! Specifications followed (editor's copies, see tests/fixtures/SOURCE.md):
 //!   * draft-irtf-cfrg-bbs-signatures (core BBS: KeyGen, SkToPk, Sign, Verify,
@@ -33,6 +35,7 @@ pub mod blind;
 pub mod bulletproofs;
 pub mod codec;
 pub mod core_bbs;
+pub mod forward_secure;
 pub mod generators;
 pub mod limits;
 pub mod pedersen;

@@ -109,7 +109,7 @@ impl Drop for EpochKey {
 impl EpochKey {
     /// SK_0 from a fresh seed (all zeros is refused: a failed CSPRNG).
     pub fn from_seed(seed: &[u8]) -> Result<Self> {
-        if seed.len() != SEED_LEN || bool::from(seed.ct_eq(&[0u8; SEED_LEN])) {
+        if seed.len() != SEED_LEN || bool::from(seed.ct_eq(&[0u8; SEED_LEN][..])) {
             return Err(Error::Invalid);
         }
         let mut k = EpochKey { state: [0u8; STATE_LEN], epoch: 0 };
@@ -208,7 +208,7 @@ fn bound<'a>(kid: &'a [u8], epoch: &'a [u8; 8], msgs: &[&'a [u8]], out: &mut [Ms
     out[0] = Msg::Hash(kid);
     out[1] = Msg::Hash(epoch);
     for (i, m) in msgs.iter().enumerate() {
-        out[BOUND_MESSAGES + i] = Msg::Hash(m);
+        out[BOUND_MESSAGES + i] = Msg::Hash(*m);
     }
     BOUND_MESSAGES + msgs.len()
 }
@@ -246,7 +246,7 @@ pub fn verify_credential(pk: &[u8], kid: &[u8], epoch: u64, sig: &[u8], msgs: &[
     let n = bound(kid, &e, msgs, &mut m);
     let mut b = [Msg::Hash(&[]); MAX_BLIND_MESSAGES];
     for (i, x) in blind_msgs.iter().enumerate() {
-        b[i] = Msg::Hash(x);
+        b[i] = Msg::Hash(*x);
     }
     blind::verify_blind_sign(pk, sig, CREDENTIAL_HEADER, &m[..n], &b[..blind_msgs.len()], prover_blind)
 }
