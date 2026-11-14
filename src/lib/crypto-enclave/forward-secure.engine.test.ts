@@ -27,6 +27,7 @@ import { lastZkMemoryForTest, withZkFrame } from "./zk-engine";
 
 const HOST = "00000000-0000-4000-8000-0000000007d3";
 const OTHER = "00000000-0000-4000-8000-0000000007d4";
+const GUEST_HOST = "00000000-0000-4000-8000-0000000007d5";
 const KEY = "host:00000000-0000-4000-8000-0000000000aa/key:1";
 const allZero = () => lastZkMemoryForTest()!.every((b) => b === 0);
 const enc = new TextEncoder();
@@ -46,8 +47,13 @@ async function withDeviceKey(userId: string) {
 type Chain = { anchor: HostKeyAnchor; epoch: number; publicKey: Uint8Array; links: EpochLink[] };
 type Signed = { epoch: number; publicKey: Uint8Array; signature: Uint8Array };
 
+// The worker wipes every request after it ran (as over postMessage), so each call gets copies.
+const copyChain = (c: Chain) => ({
+  anchor: { keyId: c.anchor.keyId, publicKey: c.anchor.publicKey.slice() },
+  links: c.links.map((l) => ({ ...l, publicKey: l.publicKey.slice(), signature: l.signature.slice() })),
+});
 const verify = (chain: Chain, epoch: number, signature: Uint8Array, extra: Record<string, unknown> = {}) =>
-  ok<{ valid: boolean }>(runEnclaveOp("host_key.verify_epoch_credential", { anchor: chain.anchor, links: chain.links, epoch, signature: signature.slice(), messages: msgs(), ...extra })).then((r) => r.valid);
+  ok<{ valid: boolean }>(runEnclaveOp("host_key.verify_epoch_credential", { ...copyChain(chain), epoch, signature: signature.slice(), messages: msgs(), ...extra })).then((r) => r.valid);
 
 /** A guest commitment through the raw engine export (Blind BBS Commit). */
 async function commit(values: Uint8Array[]) {
@@ -104,7 +110,7 @@ describe.skipIf(!dev)("forward-secure host keys through the worker (local rout-z
     // Expired by the verifier's own window.
     expect(await verify(chain, 0, s0.signature, { minEpoch: 1 })).toBe(false);
     // Edited message, edited link, another host's anchor.
-    expect(await ok<{ valid: boolean }>(runEnclaveOp("host_key.verify_epoch_credential", { anchor: chain.anchor, links: chain.links, epoch: 3, signature: s3.signature, messages: [enc.encode("x")] })).then((r) => r.valid)).toBe(false);
+    expect(await ok<{ valid: boolean }>(runEnclaveOp("host_key.verify_epoch_credential", { ...copyChain(chain), epoch: 3, signature: s3.signature.slice(), messages: [enc.encode("x")] })).then((r) => r.valid)).toBe(false);
     const bent = chain.links.map((l) => ({ ...l, publicKey: l.publicKey.slice(), signature: l.signature.slice() }));
     bent[1]!.signature[10] ^= 1;
     expect(await verify({ ...chain, links: bent }, 3, s3.signature)).toBe(false);
@@ -119,14 +125,14 @@ describe.skipIf(!dev)("forward-secure host keys through the worker (local rout-z
   }, 120_000);
 
   it("issues blind credentials that open only with the guest's blind", async () => {
-    await withDeviceKey(HOST);
+    await withDeviceKey(GUEST_HOST);
     const key = `${KEY}/blind`;
-    await ok(runEnclaveOp("host_key.init", { userId: HOST, keyId: key }));
-    await ok(runEnclaveOp("host_key.advance_epoch", { userId: HOST, keyId: key, toEpoch: 2 }));
+    await ok(runEnclaveOp("host_key.init", { userId: GUEST_HOST, keyId: key }));
+    await ok(runEnclaveOp("host_key.advance_epoch", { userId: GUEST_HOST, keyId: key, toEpoch: 2 }));
     const committed = [enc.encode("guest pseudonym"), enc.encode("guest secret")];
     const { cwp, proverBlind } = await commit(committed);
-    const s = await ok<Signed>(runEnclaveOp("host_key.sign_credential", { userId: HOST, keyId: key, epoch: 2, messages: msgs(), commitmentWithProof: cwp }));
-    const chain = await ok<Chain>(runEnclaveOp("host_key.chain", { userId: HOST, keyId: key }));
+    const s = await ok<Signed>(runEnclaveOp("host_key.sign_credential", { userId: GUEST_HOST, keyId: key, epoch: 2, messages: msgs(), commitmentWithProof: cwp }));
+    const chain = await ok<Chain>(runEnclaveOp("host_key.chain", { userId: GUEST_HOST, keyId: key }));
     expect(await verify(chain, 2, s.signature, { committedMessages: committed.map((m) => m.slice()), proverBlind: proverBlind.slice() })).toBe(true);
     expect(await verify(chain, 2, s.signature, { committedMessages: committed.map((m) => m.slice()) })).toBe(false);
     expect(await verify(chain, 2, s.signature)).toBe(false);
