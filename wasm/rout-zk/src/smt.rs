@@ -84,6 +84,17 @@ pub fn empty_root() -> Scalar {
     h
 }
 
+/// Empty subtree value at every height (leaf first, root last) into `out`
+/// (PATH_LEN octets).
+pub fn empty_path(out: &mut [u8]) {
+    let mut h = Scalar::zero();
+    out[..NODE_LEN].copy_from_slice(&scalar_to_be(&h));
+    for height in 1..=DEPTH {
+        h = node(&h, &h);
+        out[height * NODE_LEN..(height + 1) * NODE_LEN].copy_from_slice(&scalar_to_be(&h));
+    }
+}
+
 /// Bit `height` of the nullifier read as a big-endian integer.
 fn bit(nullifier: &[u8; NULLIFIER_LEN], height: usize) -> Choice {
     Choice::from((nullifier[NULLIFIER_LEN - 1 - height / 8] >> (height % 8)) & 1)

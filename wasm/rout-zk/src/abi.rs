@@ -348,10 +348,11 @@ pub unsafe extern "C" fn rout_zk_range_verify(commit: usize, ctx: usize, ctx_len
 // first, root last). The signer key is derived from `km` inside each call and
 // wiped before it returns.
 
-/// out (32): root of the empty tree.
+/// out (257 x 32): the empty subtree value at every height, leaf (0) first,
+/// the empty root last. Public constants for the untrusted node store.
 #[no_mangle]
-pub unsafe extern "C" fn rout_zk_smt_empty_root(out: usize) -> i32 {
-    output(out, NODE_LEN).copy_from_slice(&crate::codec::scalar_to_be(&smt::empty_root()));
+pub unsafe extern "C" fn rout_zk_smt_empty_path(out: usize) -> i32 {
+    smt::empty_path(output(out, PATH_LEN));
     0
 }
 

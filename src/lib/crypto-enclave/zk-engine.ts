@@ -28,10 +28,19 @@ export type ZkExports = {
   rout_zk_pedersen_commit_fresh(value: number, outBlind: number, out: number): number;
   rout_zk_range_prove(value: number, blind: number, ctx: number, ctxLen: number, outCommit: number, outProof: number): number;
   rout_zk_range_verify(commit: number, ctx: number, ctxLen: number, proof: number, proofLen: number): number;
+  rout_zk_smt_empty_path(out: number): number;
+  rout_zk_smt_signer_pk(km: number, kmLen: number, outPk: number): number;
+  rout_zk_smt_genesis(km: number, kmLen: number, tree: number, treeLen: number, outRoot: number, outSig: number): number;
+  rout_zk_smt_verify_root(pk: number, tree: number, treeLen: number, root: number, epoch: bigint, sig: number): number;
+  rout_zk_smt_verify(pk: number, tree: number, treeLen: number, root: number, epoch: bigint, sig: number, nf: number, siblings: number, member: number): number;
+  rout_zk_smt_insert(
+    km: number, kmLen: number, tree: number, treeLen: number, root: number, epoch: bigint, sig: number, nf: number, siblings: number,
+    outRoot: number, outSig: number, outPath: number,
+  ): number;
 };
 
-/** ABI 2 = BBS / Blind BBS / pseudonym (7a) + Pedersen and range proofs (7b). */
-export const ZK_ENGINE_ABI = 2;
+/** ABI 3 = BBS / Blind BBS / pseudonym (7a) + Pedersen and range proofs (7b) + Poseidon SMT with signed roots (7c). */
+export const ZK_ENGINE_ABI = 3;
 /** Linked as --initial-memory = --max-memory = 2 MiB (1 MiB stack first). */
 export const ZK_ENGINE_PAGES = 32;
 const PAGE = 65_536;
