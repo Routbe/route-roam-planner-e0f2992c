@@ -30,3 +30,11 @@ fn rejects_wrong_lengths() {
     assert!(derive(&[0u8; 32], b"h", &[0u8; 31]).is_err());
     assert!(derive(&[0u8; 32], b"", &[0u8; 32]).is_err());
 }
+
+/// Shared vector with src/lib/crypto-enclave/pseudonyms.test.ts (computed
+/// independently with Python's hmac module).
+#[test]
+fn shared_vector() {
+    let p = derive(&[7u8; 32], b"host-1", &[1u8; 32]).unwrap();
+    assert_eq!(hex::encode(p), env!("ROUT_PSEUDONYM_VECTOR"));
+}
