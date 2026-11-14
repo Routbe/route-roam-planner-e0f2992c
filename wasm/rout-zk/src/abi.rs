@@ -14,6 +14,7 @@ use bls12_381::Scalar;
 use crate::core_bbs::{self, Msg};
 use crate::limits::{MAX_BLIND_MESSAGES, MAX_MESSAGES, MAX_SIGNER_MESSAGES};
 use crate::pseudonym;
+use crate::smt::{self, NODE_LEN, NULLIFIER_LEN, PATH_LEN, SIBLINGS_LEN};
 use crate::random::FromOctets;
 use crate::{wipe, Error};
 
@@ -101,8 +102,9 @@ fn indexes(b: &[u8], out: &mut [usize; MAX_MESSAGES]) -> Result<usize, Error> {
 
 #[no_mangle]
 pub extern "C" fn rout_zk_abi_version() -> u32 {
-    // 1 = BBS / Blind BBS / pseudonym (7a); 2 = + Pedersen and range proofs (7b).
-    2
+    // 1 = BBS / Blind BBS / pseudonym (7a); 2 = + Pedersen and range proofs (7b);
+    // 3 = + Poseidon SMT nullifiers with signed roots (7c).
+    3
 }
 
 #[no_mangle]
@@ -336,6 +338,83 @@ pub unsafe extern "C" fn rout_zk_range_verify(commit: usize, ctx: usize, ctx_len
         let c = Commitment::from_bytes(input(commit, 48))?;
         let p = RangeProof::from_bytes(input(proof, proof_len))?;
         bulletproofs::verify(&PedersenGens::canonical(), &BulletproofGens::canonical(), &c, &p, input(ctx, ctx_len))?;
+        Ok(0)
+    })())
+}
+
+// ---- Stap 7c: nullifier SMT with enclave-signed roots ---------------------
+// Root (32) and nodes are big-endian scalars; signature 80; public key 96;
+// nullifier 32; siblings 256 x 32 (leaf level first); path 257 x 32 (leaf
+// first, root last). The signer key is derived from `km` inside each call and
+// wiped before it returns.
+
+/// out (32): root of the empty tree.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_empty_root(out: usize) -> i32 {
+    output(out, NODE_LEN).copy_from_slice(&crate::codec::scalar_to_be(&smt::empty_root()));
+    0
+}
+
+/// km -> signer public key (96).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_signer_pk(km: usize, km_len: usize, out_pk: usize) -> i32 {
+    code((|| {
+        output(out_pk, 96).copy_from_slice(&smt::signer_public_key(input(km, km_len))?);
+        Ok(0)
+    })())
+}
+
+/// km | tree -> empty root (32) signed at epoch 0 (80).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_genesis(km: usize, km_len: usize, tree: usize, tree_len: usize, out_root: usize, out_sig: usize) -> i32 {
+    code((|| {
+        let (root, sig) = smt::genesis(input(km, km_len), input(tree, tree_len))?;
+        output(out_root, NODE_LEN).copy_from_slice(&root);
+        output(out_sig, 80).copy_from_slice(&sig);
+        Ok(0)
+    })())
+}
+
+/// pk (96) | tree | root (32) | epoch | sig (80) -> 0, -2 (rejected), -1 (malformed).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_verify_root(pk: usize, tree: usize, tree_len: usize, root: usize, epoch: u64, sig: usize) -> i32 {
+    code((|| {
+        smt::verify_root(input(pk, 96), input(tree, tree_len), input(root, NODE_LEN), epoch, input(sig, 80))?;
+        Ok(0)
+    })())
+}
+
+/// Signed root, then NonExist (member = 0) or Exist (member = 1) of the nullifier.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_verify(
+    pk: usize, tree: usize, tree_len: usize, root: usize, epoch: u64, sig: usize, nf: usize, siblings: usize, member: u32,
+) -> i32 {
+    code((|| {
+        if member > 1 {
+            return Err(Error::Invalid);
+        }
+        smt::verify_signed(
+            input(pk, 96), input(tree, tree_len), input(root, NODE_LEN), epoch, input(sig, 80),
+            input(nf, NULLIFIER_LEN), input(siblings, SIBLINGS_LEN), member == 1,
+        )?;
+        Ok(0)
+    })())
+}
+
+/// km | tree | signed old root | nullifier | siblings -> new root (32), its
+/// signature at epoch + 1 (80) and the new path (257 x 32).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_smt_insert(
+    km: usize, km_len: usize, tree: usize, tree_len: usize, root: usize, epoch: u64, sig: usize, nf: usize, siblings: usize,
+    out_root: usize, out_sig: usize, out_path: usize,
+) -> i32 {
+    code((|| {
+        let r = smt::insert_signed(
+            input(km, km_len), input(tree, tree_len), input(root, NODE_LEN), epoch, input(sig, 80),
+            input(nf, NULLIFIER_LEN), input(siblings, SIBLINGS_LEN), output(out_path, PATH_LEN),
+        )?;
+        output(out_root, NODE_LEN).copy_from_slice(&r.root);
+        output(out_sig, 80).copy_from_slice(&r.signature);
         Ok(0)
     })())
 }
