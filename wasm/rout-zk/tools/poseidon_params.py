@@ -121,10 +121,6 @@ def main():
         for row in mds:
             print("    [" + ", ".join("Scalar::from_raw([%s])" % limbs(x) for x in row) + "],")
         print("];")
-    elif sys.argv[1:] == ["fixture"]:
-        # Only used once to transcribe the published reference file; `check`
-        # is what keeps it honest.
-        raise SystemExit("transcribe from the reference .sage file, see SOURCE.md")
     else:
         raise SystemExit(__doc__)
 
