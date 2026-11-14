@@ -163,7 +163,9 @@
   - [x] 7a: BBS (KeyGen/Sign/Verify/ProofGen/ProofVerify) + Blind BBS (Commit/BlindSign/VerifyBlindSign/BlindProofGen/BlindProofVerify met COMMIT-onthulling); alle 49 officiële fixtures byte-gelijk (cargo test)
   - [ ] build.sh + SHA-384-pin + loader voor rout-zk (vereist officiële rustup 1.95.0 / CI wasm-reproducible.yml; nu onbepind en niet geladen)
   - [ ] Timingmeting (dudect) van de gegenereerde Wasm
-  - [ ] Forward-secure sleutel per epoch (oude epochsleutels niet afleidbaar uit nieuwere)
+  - [x] 7d: forward-secure hostsleutels — HKDF-SHA256-ratchet per epoch (SK_0 uit vers random seed), oude staat in place gewist, ondertekende epoch-links vanaf anker PK_0, credentials (ook blind) gebonden aan sleutel-id + epoch; worker-ops host_key.init / advance_epoch / sign_credential / chain / verify_epoch_credential
+  - [ ] 7d vervolg: besluit hoe een host zijn sleutelketen bewaart over herladen heen (nu alleen in het werkgeheugen; een bewaarde oude kopie zou forward security opheffen)
+  - [ ] 7d vervolg: hoe gasten het anker PK_0 van een host betrouwbaar krijgen (publicatie/verankering) en welke tijdsduur één epoch is
   - [x] 7b: Pedersen-commitments (homomorf optellen/aftrekken) + Bulletproofs-range-proofs v ∈ [0, 2^64−1] in rout-zk; worker-ops pedersen.commit / bulletproofs.prove_range / bulletproofs.verify_range
   - [ ] 7b vervolg: a ≤ t ≤ b (twee range proofs op t−a en b−t) en Σcᵢ ≤ C koppelen aan boekingen (7f)
   - [ ] Externe audit van de eigen BBS-, Bulletproofs-, Poseidon- en SMT-code (regel 'audited libraries' in booking-engine/AGENTS.md)
