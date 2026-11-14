@@ -18,6 +18,7 @@
  * secure.wipe. The OPAQUE export key never leaves the worker: it becomes a
  * non-extractable AES-GCM "password vault key" (HKDF-SHA-256) and is wiped.
  */
+import { wipeZkEngineMemory } from "./zk-engine";
 import { wipe } from "@/lib/crypto/wipe";
 import { fail } from "./enclave-failure";
 import { searchPow, isPowBits } from "./hashcash";
@@ -234,6 +235,7 @@ export function wipeAllPasswordState(): number {
   n += vaultKeys.size;
   vaultKeys.clear();
   n += wipeEngineMemory();
+  n += wipeZkEngineMemory();
   return n;
 }
 

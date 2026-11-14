@@ -1,6 +1,8 @@
-//! ROUT anonymous booking engine, part 7a: BBS signatures and Blind BBS
+//! ROUT anonymous booking engine. Part 7a: BBS signatures and Blind BBS
 //! signatures over BLS12-381 (ciphersuite BLS12-381-SHA-256) and the
-//! per-booking guest pseudonym.
+//! per-booking guest pseudonym. Part 7b: Pedersen commitments with
+//! homomorphic add/sub and 64-bit Bulletproofs range proofs over G1
+//! (`pedersen`, `bulletproofs`).
 //!
 //! Specifications followed (editor's copies, see tests/fixtures/SOURCE.md):
 //!   * draft-irtf-cfrg-bbs-signatures (core BBS: KeyGen, SkToPk, Sign, Verify,
@@ -26,10 +28,12 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 pub mod blind;
+pub mod bulletproofs;
 pub mod codec;
 pub mod core_bbs;
 pub mod generators;
 pub mod limits;
+pub mod pedersen;
 pub mod pseudonym;
 pub mod random;
 pub mod wipe;

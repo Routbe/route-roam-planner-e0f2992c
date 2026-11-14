@@ -144,6 +144,15 @@ export interface EnclaveOps {
    * are transferred and wiped; only the 32-byte pseudonym comes back.
    */
   "pseudonym.derive": { req: { masterSeed: Uint8Array; hostId: string; bookingNonce: Uint8Array }; res: { pseudonym: Uint8Array } };
+  /**
+   * Pedersen commitment C = v·g + r·h (Stap 7b, bulletproofs.ts). value is a
+   * bigint in [0, 2^64 - 1]; without `blinding` a fresh 32-octet one is drawn
+   * in the engine. The blinding is the secret opening: transferred in, wiped.
+   */
+  "pedersen.commit": { req: { value: bigint; blinding?: Uint8Array }; res: { commitment: Uint8Array; blinding: Uint8Array } };
+  /** Commitment plus a 928-octet proof that value ∈ [0, 2^64 - 1], bound to `context`. */
+  "bulletproofs.prove_range": { req: { value: bigint; blinding: Uint8Array; context: Uint8Array }; res: { commitment: Uint8Array; proof: Uint8Array } };
+  "bulletproofs.verify_range": { req: { commitment: Uint8Array; proof: Uint8Array; context: Uint8Array }; res: { valid: boolean } };
   "protocol.verifyChain": { req: { events: SignedEvent[] }; res: { ok: true } | { ok: false; error: string; at: number } };
 }
 

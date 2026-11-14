@@ -164,7 +164,9 @@
   - [ ] build.sh + SHA-384-pin + loader voor rout-zk (vereist officiële rustup 1.95.0 / CI wasm-reproducible.yml; nu onbepind en niet geladen)
   - [ ] Timingmeting (dudect) van de gegenereerde Wasm
   - [ ] Forward-secure sleutel per epoch (oude epochsleutels niet afleidbaar uit nieuwere)
-  - [ ] Pedersen-commitments + Bulletproofs: a ≤ t ≤ b en Σcᵢ ≤ C
+  - [x] 7b: Pedersen-commitments (homomorf optellen/aftrekken) + Bulletproofs-range-proofs v ∈ [0, 2^64−1] in rout-zk; worker-ops pedersen.commit / bulletproofs.prove_range / bulletproofs.verify_range
+  - [ ] 7b vervolg: a ≤ t ≤ b (twee range proofs op t−a en b−t) en Σcᵢ ≤ C koppelen aan boekingen (7f)
+  - [ ] Externe audit van de eigen BBS- en Bulletproofs-code (regel 'audited libraries' in booking-engine/AGENTS.md)
   - [ ] Poseidon-SMT voor nullifiers met (non-)membership-bewijzen; hergebruik geweigerd
   - [x] 7a: pseudonyms.ts + worker-op `pseudonym.derive` (HKDF-Expand + HMAC-SHA256, gedeelde vector met Rust)
   - [ ] TS-wrappers voor BBS in de crypto-worker (na pin van rout-zk)

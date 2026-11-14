@@ -204,6 +204,16 @@ export const enclave = {
   pairwise: {
     claim: (root: Uint8Array, sector: string, nonce: string) => callEnclave("pairwise.claim", { root, sector, nonce }, moved(root)),
   },
+  zk: {
+    /** Pedersen commitment to value ∈ [0, 2^64 - 1]; a given blinding is transferred (the caller's copy is emptied). */
+    commit: (value: bigint, blinding?: Uint8Array) =>
+      callEnclave("pedersen.commit", blinding ? { value, blinding } : { value }, moved(blinding)),
+    /** Commitment + range proof bound to `context`; the blinding is transferred. */
+    proveRange: (value: bigint, blinding: Uint8Array, context: Uint8Array) =>
+      callEnclave("bulletproofs.prove_range", { value, blinding, context: context.slice() }, moved(blinding)),
+    verifyRange: (commitment: Uint8Array, proof: Uint8Array, context: Uint8Array) =>
+      callEnclave("bulletproofs.verify_range", { commitment: commitment.slice(), proof: proof.slice(), context: context.slice() }),
+  },
   rve1: {
     /** This member's RVE1 device key: id and public key only. */
     deviceKey: (userId: string) => callEnclave("rve1.deviceKey", { userId }),
