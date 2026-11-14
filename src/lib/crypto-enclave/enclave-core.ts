@@ -43,6 +43,7 @@ import { CHALLENGE_RE, recoveryLoginMessage } from "@/lib/recovery/recovery-logi
 import { cardFactorKeys } from "./card-factor";
 import { derivePseudonym, PseudonymInputError } from "./pseudonyms";
 import { pedersenCommit, proveRange, verifyRange } from "./bulletproofs";
+import { checkSignedRoot, RootWatermarks, smtGenesis, smtInsert, smtSignerKeyMaterial, smtSignerPublicKey, smtVerifyNullifier, smtVerifySignedRoot, type SignedRoot } from "./smt";
 import { ZkEngineError } from "./zk-engine";
 import {
   RECOVERY_FACTORS,
@@ -71,6 +72,7 @@ const MAX_PLAINTEXT_BYTES = 49120;
 export { EnclaveFailure };
 
 const newHandle = () => b64u.encode(crypto.getRandomValues(new Uint8Array(16)));
+const MAX_TREE_ID_CHARS = 256;
 const str = (v: unknown, max = 4096): string => (typeof v === "string" && v.length <= max ? v : fail("invalid_input"));
 const bytes = (v: unknown): Uint8Array =>
   v instanceof Uint8Array && v.buffer instanceof ArrayBuffer ? v : fail("invalid_input");
@@ -85,6 +87,32 @@ async function zkOp<T>(run: () => Promise<T>): Promise<T> {
     }
     throw e;
   }
+}
+
+/** Highest signed nullifier-tree root seen per (member, tree) in this worker (smt.ts). */
+const smtMarks = new RootWatermarks();
+
+/** A signed root from an untrusted store, re-built from validated copies only. */
+function signedRootArg(v: unknown): SignedRoot {
+  let s: SignedRoot;
+  try {
+    s = checkSignedRoot(v);
+  } catch {
+    return fail("invalid_input");
+  }
+  return { treeId: s.treeId, epoch: s.epoch, root: bytes(s.root), publicKey: bytes(s.publicKey), signature: bytes(s.signature) };
+}
+
+/** Runs `fn` with this member's root-signing key material (from the RVE1 device seed), wiped afterwards. */
+async function withSmtKey<T>(userId: string, fn: (keyMaterial: Uint8Array) => Promise<T>): Promise<T> {
+  return withRve1Key(userId, async (seed) => {
+    const km = smtSignerKeyMaterial(seed);
+    try {
+      return await zkOp(() => fn(km));
+    } finally {
+      wipe(km);
+    }
+  });
 }
 
 // ---- Held state (all of it wiped on discard / expiry) ----------------------
@@ -878,6 +906,49 @@ const coreHandlers: CoreHandlers = {
     const p = bytes(proof);
     const ctx = bytes(context);
     return { valid: await zkOp(() => verifyRange(c, p, ctx)) };
+  },
+
+  async "smt.genesis"({ userId, treeId }) {
+    const owner = str(userId, 200);
+    const tree = str(treeId, MAX_TREE_ID_CHARS);
+    // A tree this worker already follows is never reset to the empty root.
+    if (smtMarks.has(owner, tree)) fail("invalid_input");
+    const signedRoot = await withSmtKey(owner, (km) => smtGenesis(km, tree));
+    smtMarks.observe(owner, signedRoot);
+    return { signedRoot };
+  },
+
+  async "smt.insert_nullifier"({ userId, signedRoot, nullifier, siblings }) {
+    const owner = str(userId, 200);
+    const s = signedRootArg(signedRoot);
+    const nf = bytes(nullifier);
+    const sib = bytes(siblings);
+    if (!smtMarks.admissible(owner, s)) return { inserted: false as const };
+    const r = await withSmtKey(owner, (km) => smtInsert(km, s, nf, sib));
+    if (!r) return { inserted: false as const };
+    smtMarks.observe(owner, s);
+    smtMarks.observe(owner, r.signedRoot);
+    return { inserted: true as const, signedRoot: r.signedRoot, path: r.path };
+  },
+
+  async "smt.verify_non_membership"({ userId, signedRoot, nullifier, siblings }) {
+    const owner = str(userId, 200);
+    const s = signedRootArg(signedRoot);
+    const nf = bytes(nullifier);
+    const sib = bytes(siblings);
+    if (!smtMarks.admissible(owner, s)) return { valid: false };
+    const valid = await withSmtKey(owner, async (km) => smtVerifyNullifier(s, await smtSignerPublicKey(km), nf, sib, false));
+    if (valid) smtMarks.observe(owner, s);
+    return { valid };
+  },
+
+  async "smt.verify_signed_root"({ userId, signedRoot }) {
+    const owner = str(userId, 200);
+    const s = signedRootArg(signedRoot);
+    if (!smtMarks.admissible(owner, s)) return { valid: false };
+    const valid = await withSmtKey(owner, async (km) => smtVerifySignedRoot(s, await smtSignerPublicKey(km)));
+    if (valid) smtMarks.observe(owner, s);
+    return { valid };
   },
 
   async "hash.sha256Hex"({ text }) {

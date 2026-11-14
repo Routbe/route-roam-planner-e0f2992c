@@ -11,6 +11,7 @@ import type { PrivateEnvelope } from "@/lib/ledger/crypto";
 import type { Capability, CapabilityGrant } from "@/lib/protocol/capabilities";
 import type { EventDraft, SignedEvent } from "@/lib/protocol/events";
 import type { RecoveryCeremony } from "./recovery-mpc";
+import type { SignedRoot } from "./smt";
 import type { SubjectClaim } from "@/lib/recovery/pairwise";
 
 /** Public metadata of a decrypted handoff; the full config stays inside the worker. */

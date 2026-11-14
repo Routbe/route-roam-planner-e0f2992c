@@ -214,6 +214,16 @@ export const enclave = {
     verifyRange: (commitment: Uint8Array, proof: Uint8Array, context: Uint8Array) =>
       callEnclave("bulletproofs.verify_range", { commitment: commitment.slice(), proof: proof.slice(), context: context.slice() }),
   },
+  smt: {
+    /** Empty nullifier tree for `treeId`, signed at epoch 0 by this member's root key. */
+    genesis: (userId: string, treeId: string) => callEnclave("smt.genesis", { userId, treeId }),
+    /** Spends `nullifier` against a signed root; { inserted: false } for a reused nullifier, a foreign/edited/stale root or wrong siblings. */
+    insertNullifier: (userId: string, signedRoot: SignedRoot, nullifier: Uint8Array, siblings: Uint8Array) =>
+      callEnclave("smt.insert_nullifier", { userId, signedRoot: copyRoot(signedRoot), nullifier: nullifier.slice(), siblings: siblings.slice() }),
+    verifyNonMembership: (userId: string, signedRoot: SignedRoot, nullifier: Uint8Array, siblings: Uint8Array) =>
+      callEnclave("smt.verify_non_membership", { userId, signedRoot: copyRoot(signedRoot), nullifier: nullifier.slice(), siblings: siblings.slice() }),
+    verifySignedRoot: (userId: string, signedRoot: SignedRoot) => callEnclave("smt.verify_signed_root", { userId, signedRoot: copyRoot(signedRoot) }),
+  },
   rve1: {
     /** This member's RVE1 device key: id and public key only. */
     deviceKey: (userId: string) => callEnclave("rve1.deviceKey", { userId }),
