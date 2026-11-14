@@ -109,9 +109,6 @@ fn tampered_or_misplaced_links_are_rejected() {
 fn a_compromised_later_key_yields_no_earlier_key_or_signature() {
     let (k, pks, _) = chain(3);
     let stolen = state_of(&k); // the attacker has SK_3 and everything derived from it
-    let f = fixture();
-    let _ = f; // the reference states above are for SEED-independent checks only
-    let (_, _, _) = chain(0);
     let mut earlier = vec![];
     let mut e0 = EpochKey::from_seed(&SEED).unwrap();
     earlier.push(state_of(&e0));
