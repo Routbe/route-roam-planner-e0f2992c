@@ -6,7 +6,11 @@
 //! Index list: `count` u32 LE values.
 
 use crate::blind;
+use crate::bulletproofs::{self, BulletproofGens, RangeProof, PROOF_LEN};
+use crate::pedersen::{value_u64, Commitment, PedersenGens};
+use crate::random::ScalarSource;
 use crate::codec::{scalar_from_be, scalar_to_be};
+use bls12_381::Scalar;
 use crate::core_bbs::{self, Msg};
 use crate::limits::{MAX_BLIND_MESSAGES, MAX_MESSAGES, MAX_SIGNER_MESSAGES};
 use crate::pseudonym;
@@ -97,7 +101,8 @@ fn indexes(b: &[u8], out: &mut [usize; MAX_MESSAGES]) -> Result<usize, Error> {
 
 #[no_mangle]
 pub extern "C" fn rout_zk_abi_version() -> u32 {
-    1
+    // 1 = BBS / Blind BBS / pseudonym (7a); 2 = + Pedersen and range proofs (7b).
+    2
 }
 
 #[no_mangle]
@@ -227,6 +232,106 @@ pub unsafe extern "C" fn rout_zk_verify_blind_sign(
         let r = blind::verify_blind_sign(input(pk, 96), input(sig, 80), input(h, h_len), &m[..n], &b[..k], &pb);
         wipe::scalar(&mut pb);
         r?;
+        Ok(0)
+    })())
+}
+
+/// A value of the 7b interface: 32 octets big-endian, which must lie in
+/// [0, 2^64 - 1]; anything else (including "negative" q - k) is INVALID.
+fn range_value(b: &[u8]) -> Result<Scalar, Error> {
+    let s = scalar_from_be(b)?;
+    if value_u64(&s).is_none() {
+        let mut s = s;
+        wipe::scalar(&mut s);
+        return Err(Error::Invalid);
+    }
+    Ok(s)
+}
+
+/// value (32) | blinding (32) -> commitment (48).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_pedersen_commit(value: usize, blind: usize, out: usize) -> i32 {
+    code((|| {
+        let mut v = range_value(input(value, 32))?;
+        let mut r = scalar_from_be(input(blind, 32));
+        let c = r.as_ref().map(|r| PedersenGens::canonical().commit(&v, r).to_bytes());
+        wipe::scalar(&mut v);
+        if let Ok(r) = r.as_mut() {
+            wipe::scalar(r);
+        }
+        output(out, 48).copy_from_slice(&c?);
+        Ok(0)
+    })())
+}
+
+/// value (32) -> fresh blinding from the host CSPRNG (32) and commitment (48).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_pedersen_commit_fresh(value: usize, out_blind: usize, out: usize) -> i32 {
+    code((|| {
+        let mut v = range_value(input(value, 32))?;
+        let mut r = [Scalar::zero(); 1];
+        let filled = host_rng().fill(&mut r);
+        let c = PedersenGens::canonical().commit(&v, &r[0]).to_bytes();
+        let rb = scalar_to_be(&r[0]);
+        wipe::scalar(&mut v);
+        wipe::scalars(&mut r);
+        filled?;
+        output(out_blind, 32).copy_from_slice(&rb);
+        output(out, 48).copy_from_slice(&c);
+        Ok(0)
+    })())
+}
+
+/// a (48), b (48), op (0 = a·b, 1 = a·b^{-1}) -> out (48). Both inputs pass
+/// the subgroup checks; an identity result is refused.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_pedersen_combine(a: usize, b: usize, op: u32, out: usize) -> i32 {
+    code((|| {
+        let x = Commitment::from_bytes(input(a, 48))?;
+        let y = Commitment::from_bytes(input(b, 48))?;
+        let c = match op {
+            0 => x.add(&y),
+            1 => x.sub(&y),
+            _ => return Err(Error::Invalid),
+        };
+        if bool::from(c.0.is_identity()) {
+            return Err(Error::Invalid);
+        }
+        output(out, 48).copy_from_slice(&c.to_bytes());
+        Ok(0)
+    })())
+}
+
+/// value (32) | blinding (32) | ctx -> commitment (48) and proof (928).
+/// Returns the proof length.
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_range_prove(value: usize, blind: usize, ctx: usize, ctx_len: usize, out_commit: usize, out_proof: usize) -> i32 {
+    code((|| {
+        let mut v = range_value(input(value, 32))?;
+        let mut r = match scalar_from_be(input(blind, 32)) {
+            Ok(r) => r,
+            Err(e) => {
+                wipe::scalar(&mut v);
+                return Err(e);
+            }
+        };
+        let res = bulletproofs::prove(&PedersenGens::canonical(), &BulletproofGens::canonical(), &v, &r, input(ctx, ctx_len), &mut host_rng());
+        wipe::scalar(&mut v);
+        wipe::scalar(&mut r);
+        let (c, p) = res?;
+        output(out_commit, 48).copy_from_slice(&c.to_bytes());
+        output(out_proof, PROOF_LEN).copy_from_slice(&p.to_bytes());
+        Ok(PROOF_LEN as i32)
+    })())
+}
+
+/// commitment (48) | ctx | proof -> 0 or -2 (rejected) / -1 (malformed).
+#[no_mangle]
+pub unsafe extern "C" fn rout_zk_range_verify(commit: usize, ctx: usize, ctx_len: usize, proof: usize, proof_len: usize) -> i32 {
+    code((|| {
+        let c = Commitment::from_bytes(input(commit, 48))?;
+        let p = RangeProof::from_bytes(input(proof, proof_len))?;
+        bulletproofs::verify(&PedersenGens::canonical(), &BulletproofGens::canonical(), &c, &p, input(ctx, ctx_len))?;
         Ok(0)
     })())
 }
