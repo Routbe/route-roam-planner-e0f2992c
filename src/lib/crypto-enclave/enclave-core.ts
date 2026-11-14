@@ -42,6 +42,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { CHALLENGE_RE, recoveryLoginMessage } from "@/lib/recovery/recovery-login";
 import { cardFactorKeys } from "./card-factor";
 import { derivePseudonym, PseudonymInputError } from "./pseudonyms";
+import { pedersenCommit, proveRange, verifyRange } from "./bulletproofs";
+import { ZkEngineError } from "./zk-engine";
 import {
   RECOVERY_FACTORS,
   VERSION_FACTORS,
@@ -72,6 +74,18 @@ const newHandle = () => b64u.encode(crypto.getRandomValues(new Uint8Array(16)));
 const str = (v: unknown, max = 4096): string => (typeof v === "string" && v.length <= max ? v : fail("invalid_input"));
 const bytes = (v: unknown): Uint8Array =>
   v instanceof Uint8Array && v.buffer instanceof ArrayBuffer ? v : fail("invalid_input");
+
+/** rout-zk errors to enclave codes: no pin / bad bytes / trap = unavailable, the rest = invalid input. */
+async function zkOp<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (e instanceof ZkEngineError) {
+      return fail(e.code === "zk_invalid_input" || e.code === "zk_rejected" ? "invalid_input" : "enclave_unavailable");
+    }
+    throw e;
+  }
+}
 
 // ---- Held state (all of it wiped on discard / expiry) ----------------------
 
@@ -838,6 +852,32 @@ const coreHandlers: CoreHandlers = {
     } finally {
       wipe(seed, nonce);
     }
+  },
+
+  async "pedersen.commit"({ value, blinding }) {
+    const r = blinding === undefined ? undefined : bytes(blinding);
+    try {
+      return await zkOp(() => pedersenCommit(value, r));
+    } finally {
+      if (r) wipe(r);
+    }
+  },
+
+  async "bulletproofs.prove_range"({ value, blinding, context }) {
+    const r = bytes(blinding);
+    const ctx = bytes(context);
+    try {
+      return await zkOp(() => proveRange(value, r, ctx));
+    } finally {
+      wipe(r);
+    }
+  },
+
+  async "bulletproofs.verify_range"({ commitment, proof, context }) {
+    const c = bytes(commitment);
+    const p = bytes(proof);
+    const ctx = bytes(context);
+    return { valid: await zkOp(() => verifyRange(c, p, ctx)) };
   },
 
   async "hash.sha256Hex"({ text }) {
