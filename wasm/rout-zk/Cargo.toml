@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2021"
 publish = false
 license = "AGPL-3.0-only"
-description = "ROUT anonymous booking engine: BBS and Blind BBS (BLS12-381-SHA-256), per-booking pseudonyms; fixed memory, allocator-free"
+description = "ROUT anonymous booking engine: BBS and Blind BBS (BLS12-381-SHA-256), per-booking pseudonyms, Pedersen commitments and 64-bit Bulletproofs range proofs; fixed memory, allocator-free"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
