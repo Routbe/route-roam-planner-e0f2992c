@@ -48,34 +48,35 @@ describe.skipIf(!dev)("rout-zk 7b through the crypto worker (local build)", () =
   });
 
   it("proves and verifies v in [0, 2^64-1] and wipes engine memory after each call", async () => {
-    const ctx = enc.encode("slot-42/booking-1");
+    // The worker zero-fills every request buffer after the op, so each call gets its own copy.
+    const ctx = () => enc.encode("slot-42/booking-1");
     for (const value of [0n, 1n, 9n, (1n << 64n) - 1n]) {
       const { blinding } = await ok<{ commitment: Uint8Array; blinding: Uint8Array }>(runEnclaveOp("pedersen.commit", { value }));
       expect(allZero()).toBe(true);
       const keep = blinding.slice();
-      const { commitment, proof } = await ok<{ commitment: Uint8Array; proof: Uint8Array }>(runEnclaveOp("bulletproofs.prove_range", { value, blinding, context: ctx }));
+      const { commitment, proof } = await ok<{ commitment: Uint8Array; proof: Uint8Array }>(runEnclaveOp("bulletproofs.prove_range", { value, blinding, context: ctx() }));
       expect(allZero()).toBe(true);
       expect(blinding.every((b) => b === 0)).toBe(true); // the worker wiped its copy
       expect(commitment).toHaveLength(COMMITMENT_BYTES);
       expect(proof).toHaveLength(RANGE_PROOF_BYTES);
       const again = await ok<{ commitment: Uint8Array }>(runEnclaveOp("pedersen.commit", { value, blinding: keep.slice() }));
       expect(Buffer.from(again.commitment).equals(Buffer.from(commitment))).toBe(true);
-      expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment, proof, context: ctx }))).toEqual({ valid: true });
+      expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment, proof, context: ctx() }))).toEqual({ valid: true });
       expect(allZero()).toBe(true);
     }
   }, 120_000);
 
   it("rejects a wrong context, a tampered proof and another commitment", async () => {
-    const ctx = enc.encode("slot-1");
+    const ctx = () => enc.encode("slot-1");
     const blinding = crypto.getRandomValues(new Uint8Array(32));
     blinding[0] &= 0x3f; // < q
-    const { commitment, proof } = await ok<{ commitment: Uint8Array; proof: Uint8Array }>(runEnclaveOp("bulletproofs.prove_range", { value: 3n, blinding: blinding.slice(), context: ctx }));
+    const { commitment, proof } = await ok<{ commitment: Uint8Array; proof: Uint8Array }>(runEnclaveOp("bulletproofs.prove_range", { value: 3n, blinding: blinding.slice(), context: ctx() }));
     expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment, proof, context: enc.encode("slot-2") }))).toEqual({ valid: false });
     const bad = proof.slice();
     bad[RANGE_PROOF_BYTES - 1] ^= 1;
-    expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment, proof: bad, context: ctx }))).toEqual({ valid: false });
+    expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment, proof: bad, context: ctx() }))).toEqual({ valid: false });
     const other = await ok<{ commitment: Uint8Array }>(runEnclaveOp("pedersen.commit", { value: 4n, blinding: blinding.slice() }));
-    expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment: other.commitment, proof, context: ctx }))).toEqual({ valid: false });
+    expect(await ok(runEnclaveOp("bulletproofs.verify_range", { commitment: other.commitment, proof, context: ctx() }))).toEqual({ valid: false });
   }, 120_000);
 
   it("refuses a non-canonical blinding (>= q) inside the engine", async () => {
