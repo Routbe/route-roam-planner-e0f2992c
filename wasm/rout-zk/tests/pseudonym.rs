@@ -36,5 +36,5 @@ fn rejects_wrong_lengths() {
 #[test]
 fn shared_vector() {
     let p = derive(&[7u8; 32], b"host-1", &[1u8; 32]).unwrap();
-    assert_eq!(hex::encode(p), env!("ROUT_PSEUDONYM_VECTOR"));
+    assert_eq!(hex::encode(p), "0e80bd98bcb57b6e5c68f3f48ea94b5b1a9e1087520083bf1ee2f8855719140c");
 }

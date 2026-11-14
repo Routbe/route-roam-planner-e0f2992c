@@ -41,6 +41,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { CHALLENGE_RE, recoveryLoginMessage } from "@/lib/recovery/recovery-login";
 import { cardFactorKeys } from "./card-factor";
+import { derivePseudonym, PseudonymInputError } from "./pseudonyms";
 import {
   RECOVERY_FACTORS,
   VERSION_FACTORS,
@@ -824,6 +825,19 @@ const coreHandlers: CoreHandlers = {
         return fail("decrypt_failed");
       }
     });
+  },
+
+  async "pseudonym.derive"({ masterSeed, hostId, bookingNonce }) {
+    const seed = bytes(masterSeed);
+    const nonce = bytes(bookingNonce);
+    try {
+      return { pseudonym: derivePseudonym(seed, str(hostId, 256), nonce) };
+    } catch (e) {
+      if (e instanceof PseudonymInputError) fail("invalid_input");
+      throw e;
+    } finally {
+      wipe(seed, nonce);
+    }
   },
 
   async "hash.sha256Hex"({ text }) {
