@@ -2,3 +2,5 @@
 
 - `bbs/`: https://github.com/decentralized-identity/bbs-signature, commit bd2bc459118dd4f1db2a5a64f3cc468148aa3373, `tooling/fixtures/fixture_data/bls12-381-sha-256/`
 - `blind/`: https://github.com/cfrg/draft-irtf-cfrg-bbs-blind-signatures, commit 550329317f38e1b73e91fc251a206f20835320a3, `fixtures/fixture_data/bls12-381-sha-256/`
+- `poseidon/x5_255_3.json`: transcribed from the Poseidon reference implementation (hadeshash, Grassi et al.), https://extgit.iaik.tugraz.at/krypto/hadeshash, branch master, `code/poseidonperm_x5_255_3.sage` (round constants, MDS; sha256 `a1d6378253fd87a2b7dc5c40a870723462fb7f624487cd62acd96d6d49e33ea1`) and `code/test_vectors.txt` (the x5_255_3 vector; sha256 `beeb045c494b6e5268826e1abfe8618d6dc81ff2e3e0e18fa42ba718bee25d5f`), downloaded 2026-11-14. `tools/poseidon_params.py check` regenerates every constant from the Grain LFSR of `code/generate_parameters_grain.sage` and confirms the transcription.
+- `smt/empty_root.hex`: root of the empty 256-deep nullifier tree, computed independently by `tools/poseidon_params.py` (Python) and asserted by both `tests/smt.rs` and `src/lib/crypto-enclave/smt.test.ts`.
