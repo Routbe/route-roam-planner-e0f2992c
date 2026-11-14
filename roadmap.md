@@ -159,12 +159,16 @@
   - [ ] Android Key: KeyDescription-niveaus en RootOfTrust parsen (telt nu nooit als geattesteerd)
   - [ ] Eerste echte registratie met een beveiligingssleutel na deploy (vereist ROUT_VAULT_KEK)
 - [ ] Stap 7: anonieme boekingsmotor (besluiten eigenaar 2026-11-14: pseudoniem per boeking, eigen allocatorvrije Rust-Wasm op zkcrypto bls12_381)
-  - [ ] Nieuwe gepinde Wasm-module (vast geheugen, geen allocator, reproduceerbare build, SHA-384-pin, wissen bij teardown)
-  - [ ] BBS (IETF-draft, BLS12-381-SHA-256) + blind tekenen; getoetst aan de officiële fixtures
+  - [x] 7a: wasm/rout-zk (no_std, geen allocator, geen memory.grow, vaste geïmporteerde memory, volatile wissen, subgroepcontrole G1/G2, `subtle`)
+  - [x] 7a: BBS (KeyGen/Sign/Verify/ProofGen/ProofVerify) + Blind BBS (Commit/BlindSign/VerifyBlindSign/BlindProofGen/BlindProofVerify met COMMIT-onthulling); alle 49 officiële fixtures byte-gelijk (cargo test)
+  - [ ] build.sh + SHA-384-pin + loader voor rout-zk (vereist officiële rustup 1.95.0 / CI wasm-reproducible.yml; nu onbepind en niet geladen)
+  - [ ] Timingmeting (dudect) van de gegenereerde Wasm
   - [ ] Forward-secure sleutel per epoch (oude epochsleutels niet afleidbaar uit nieuwere)
   - [ ] Pedersen-commitments + Bulletproofs: a ≤ t ≤ b en Σcᵢ ≤ C
   - [ ] Poseidon-SMT voor nullifiers met (non-)membership-bewijzen; hergebruik geweigerd
-  - [ ] pseudonyms.ts (per boeking), TS-wrappers in de crypto-enclave
+  - [x] 7a: pseudonyms.ts + worker-op `pseudonym.derive` (HKDF-Expand + HMAC-SHA256, gedeelde vector met Rust)
+  - [ ] TS-wrappers voor BBS in de crypto-worker (na pin van rout-zk)
+  - [ ] Besluit: waar het master_seed van de gast vandaan komt (7f)
   - [ ] db-pending/0273 + rollback (deny-all, definers, audit-acties) + PGlite-test
   - [ ] Volledige suite + typecheck
   - [ ] 0273 op Neon — wacht op handmatige GO eigenaar

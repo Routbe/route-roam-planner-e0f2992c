@@ -139,6 +139,11 @@ export interface EnclaveOps {
   "protocol.openEvent": { req: { userId: string; event: SignedEvent }; res: { plaintext: Uint8Array } };
   "protocol.dpop": { req: { userId: string; method: string; url: string }; res: { proof: string } };
   "protocol.delegate": { req: { userId: string; grant: CapabilityGrant; parent?: Capability | null }; res: Capability };
+  /**
+   * Per-booking guest pseudonym (Stap 7a, pseudonyms.ts). The seed and nonce
+   * are transferred and wiped; only the 32-byte pseudonym comes back.
+   */
+  "pseudonym.derive": { req: { masterSeed: Uint8Array; hostId: string; bookingNonce: Uint8Array }; res: { pseudonym: Uint8Array } };
   "protocol.verifyChain": { req: { events: SignedEvent[] }; res: { ok: true } | { ok: false; error: string; at: number } };
 }
 
