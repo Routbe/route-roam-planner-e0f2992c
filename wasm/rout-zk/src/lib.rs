@@ -21,10 +21,9 @@
 //!     before it is used in arithmetic or a pairing;
 //!   * comparisons of scalars, challenges and pseudonyms use
 //!     `subtle::ConstantTimeEq`.
-#![no_std]
-
-#[cfg(test)]
-extern crate std;
+// Native builds (cargo test) link std for the test harness; the shipped
+// wasm32 module is no_std with no allocator.
+#![cfg_attr(target_arch = "wasm32", no_std)]
 
 pub mod blind;
 pub mod codec;
