@@ -1,0 +1,45 @@
+{
+  "caseName": "Valid Zero Blind Messages and Zero Signer Messages Revealed Proof",
+  "mockRngParameters": {
+    "SEED": "3.141592653589793238462643383279",
+    "proof": {
+      "DST": "BBS_BLS12381G1_XMD:SHA-256_SSWU_RO_H2G_HM2S_PROOF_MOCK_RANDOM_SCALARS_DST_",
+      "count": 6
+    }
+  },
+  "signerPublicKey": "a820f230f6ae38503b86c70dc50b61c58a77e45c39ab25c0652bbaa8fa136f2851bd4781c9dcde39fc9d1d52c9e60268061e7d7632171d91aa8d460acee0e96f1e7c4cfb12d3ff9ab5d5dc91c277db75c845d649ef3c4f63aebc364cd55ded0c",
+  "signatureFile": "signature001.json",
+  "header": "11223344556677889900aabbccddeeff",
+  "presentationHeader": "bed231d880675ed101ead304512e043ade9958dd0241ea70b4b3957fba941501",
+  "messageDisclosures": [],
+  "blindMessageDisclosures": [],
+  "L": 0,
+  "proof": "0000000000000130af607ae478e51503cd6b1fb1b4bcd7eef4edb78abc7bd7b5f29b62f0c82a85f2effb61c042bd645f6b5c580a073910a38c3495d1f76f6f6352732664ac3e7b69e4642edd51e3d33a0c6cd180cd79a491a3b2f96896163919bf4b416f70b0b199887cd6c27624f58ea23e6f295ea55483609763911e5ba090549e4a8e45bffd8a457102bce2dc4a36f582ce78ff84fc0a3f630dd9c09ffdbe6a3128d255abd468aa3a23cf3fd9072c7d9e20c72c2b54524719e4c392a139946472b1a92cf809532faeb57a4890f4b1bacdda26413b7dbc2ff80e6455c0221433cfad3483172afa00f6fd59ceeb84abf48f3ce9561cd8595c1b8851409792957f84ba5b7762a82bfe5a9ec6fc2ecbd7aa1985cdd1779e1115b6cf95eae6a2981ffe50baae3f709cefb00c4d5700d8ce8e2068272505f348",
+  "result": {
+    "valid": true
+  },
+  "trace": {
+    "randomScalars": {
+      "r1": "2cf2bd257845b6138247ad87cb387aee347a9104fd1090f92e3b7559e855b068",
+      "r2": "14f989abea9c9d0cbae6d72e2eb806ac7dbfcd08a8ed647ad5b8e16a83b94d4a",
+      "e_Tilde": "07e5d7e2b504d3e3075617400781df19831fac0763602bc494b3fe40dcdefb47",
+      "r1_Tilde": "35888226d06bd50f1901008bdf70b1472ad98304664828c6a0fa45b396cca7d9",
+      "r3_Tilde": "21e5d2a43d0190ddee9319dab20ad1bfaacf7c12399ac384fe9bf1235c191907",
+      "m_tilde_scalars": [
+        "6683a44c7e1b057c7ce5e99dca9d71a091441b6c23ad9bfd45ba23862f610cf7"
+      ],
+      "s_i": [],
+      "s_tilde_i": []
+    },
+    "A": "ab54c35fb2af5c75d6368bc5772547e126d60a92205d011bb9ee5d1149432e91611fd376fe5b79d6ed7c2ba00a19b743",
+    "Abar": "af607ae478e51503cd6b1fb1b4bcd7eef4edb78abc7bd7b5f29b62f0c82a85f2effb61c042bd645f6b5c580a073910a3",
+    "Bbar": "8c3495d1f76f6f6352732664ac3e7b69e4642edd51e3d33a0c6cd180cd79a491a3b2f96896163919bf4b416f70b0b199",
+    "D": "887cd6c27624f58ea23e6f295ea55483609763911e5ba090549e4a8e45bffd8a457102bce2dc4a36f582ce78ff84fc0a",
+    "T1": "ad14ecfda0814ab42f428eb68d56695d08d6ef6f94742e1352624f7750d82054b83c9594fb9c18c24ccbe27f4a2282fb",
+    "T2": "aba2ad8bde8dbfef1579a7f56855eba58aa335b449468048ac72dd64ba2fb9941ac45e1e02c8837f80080bc939a063e0",
+    "C_i": [],
+    "C_tilde_i": [],
+    "domain": "0b3a152bc770ff9e21f09ac58f59c99379ca0eeb61990ba666d994014085b332",
+    "challenge": "15b6cf95eae6a2981ffe50baae3f709cefb00c4d5700d8ce8e2068272505f348"
+  }
+}
