@@ -164,8 +164,10 @@
   - [ ] build.sh + SHA-384-pin + loader voor rout-zk (vereist officiële rustup 1.95.0 / CI wasm-reproducible.yml; nu onbepind en niet geladen)
   - [ ] Timingmeting (dudect) van de gegenereerde Wasm
   - [x] 7d: forward-secure hostsleutels — HKDF-SHA256-ratchet per epoch (SK_0 uit vers random seed), oude staat in place gewist, ondertekende epoch-links vanaf anker PK_0, credentials (ook blind) gebonden aan sleutel-id + epoch; worker-ops host_key.init / advance_epoch / sign_credential / chain / verify_epoch_credential
-  - [ ] 7d vervolg: besluit hoe een host zijn sleutelketen bewaart over herladen heen (nu alleen in het werkgeheugen; een bewaarde oude kopie zou forward security opheffen)
-  - [ ] 7d vervolg: hoe gasten het anker PK_0 van een host betrouwbaar krijgen (publicatie/verankering) en welke tijdsduur één epoch is
+  - [x] 7d vervolg: besluit bewaren SK_t (eigenaar 2026-11-14): alleen de actuele staat, als RVE1-envelop (kind 9 hsk) onder de Master KEK in vault_enclave; tabel staat in db-pending/0273
+  - [ ] 7f: hsk-envelop in pqc-envelope.ts + sluiten/openen van SK_t; let op: met KEK kan de server SK_t openen, en oude enveloppen blijven in Neon-geschiedenis/back-ups (zie appendix 7e)
+  - [x] 7d vervolg: PK_0 gebonden aan het hostrecord bij init (anon_host_keys, db-pending/0273), handtekening + ondertekenaar opgeslagen; keten publiek leesbaar via anon_host_chain
+  - [ ] 7f: welke sleutel de ankerhandtekening zet en over welk bericht, hoe een gast het sleutel-id van een host vindt, en de duur van één epoch
   - [x] 7b: Pedersen-commitments (homomorf optellen/aftrekken) + Bulletproofs-range-proofs v ∈ [0, 2^64−1] in rout-zk; worker-ops pedersen.commit / bulletproofs.prove_range / bulletproofs.verify_range
   - [ ] 7b vervolg: a ≤ t ≤ b (twee range proofs op t−a en b−t) en Σcᵢ ≤ C koppelen aan boekingen (7f)
   - [ ] Externe audit van de eigen BBS-, Bulletproofs-, Poseidon- en SMT-code (regel 'audited libraries' in booking-engine/AGENTS.md)
@@ -175,8 +177,9 @@
   - [x] 7a: pseudonyms.ts + worker-op `pseudonym.derive` (HKDF-Expand + HMAC-SHA256, gedeelde vector met Rust)
   - [ ] TS-wrappers voor BBS in de crypto-worker (na pin van rout-zk)
   - [ ] Besluit: waar het master_seed van de gast vandaan komt (7f)
-  - [ ] db-pending/0273 + rollback (deny-all, definers, audit-acties) + PGlite-test
-  - [ ] Volledige suite + typecheck
+  - [x] 7e: db-pending/0273 + idempotente rollback (deny_all, definers, 7 audit-acties) + PGlite-test (replay → 0273 → rollback → 0273, schema-vingerafdruk gelijk, fast-check-model + 2×70 interleavings)
+  - [x] Volledige suite + typecheck
+  - [ ] Vóór 0273 naar db/: tabellen indelen in account-merge-rules / purge (host_user_id cascade) en schema-snapshot bijwerken
   - [ ] 0273 op Neon — wacht op handmatige GO eigenaar
 - [ ] Stap 8: hybride PQ-ratchet + RVE2
 - [ ] Stap 9: RLS non-interference-model (Z3/Lean) vergeleken met de snapshot in CI

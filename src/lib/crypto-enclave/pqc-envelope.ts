@@ -10,7 +10,8 @@
  * Layout (all fixed except the AEAD body):
  *   0   4    magic "RVE1" (checked by db/0221)
  *   4   1    suite (1 = this construction)
- *   5   1    token kind (1 vtk, 2 vcc, 3 mpc, 4 sdm; booking blobs 5 bkh, 6 bkg; 7 opk; 8 pak)
+ *   5   1    token kind (1 vtk, 2 vcc, 3 mpc, 4 sdm; booking blobs 5 bkh, 6 bkg; 7 opk; 8 pak;
+ *            9 hsk reserved: host ratchet state, server vault, db-pending/0273, not sealed yet)
  *   6   1    key holder (1 server vault, 2 member device, 3 shard factor, 4 booking guest)
  *   7   16   recipient key id = SHA-256("rout.rve1.kid" || publicKey)[0..16)
  *   23  1600 hybrid KEM ciphertext (ML-KEM-1024 1568 || X25519 32)
